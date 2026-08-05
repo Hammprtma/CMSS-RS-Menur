@@ -1,13 +1,14 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { Equipment, MaintenanceLog } from "@/app/types/equipment";
 import { EquipmentHeader } from "@/app/components/cmms/EquipmentHeader";
 import { InfoSectionHeader } from "@/app/components/cmms/InfoSectionHeader";
 import { EquipmentDetailsGrid } from "@/app/components/cmms/EquipmentDetailsGrid";
 import { MaintenanceHistory } from "@/app/components/cmms/MaintenanceHistory";
 import { DeleteConfirmModal } from "@/app/components/cmms/DeleteConfirmModal";
+import { DeleteEquipmentModal } from "@/app/components/cmms/DeleteEquipmentModal";
 
 import { CertificateModal } from "@/app/components/cmms/CertificateModal";
 import { EditEquipmentModal } from "@/app/components/cmms/EditEquipmentModal";
@@ -26,6 +27,7 @@ import { supabase } from "@/lib/supabase";
 
 export default function EquipmentDetailPage() {
   const params = useParams();
+  const router = useRouter();
   const rawId = (params?.id as string) || "";
   const equipmentId = decodeURIComponent(rawId);
 
@@ -45,6 +47,7 @@ export default function EquipmentDetailPage() {
   // ─── Delete Confirmation State ────────────────────────────
   const [logToDelete, setLogToDelete] = useState<string | number | null>(null);
   const [isDeleting, setIsDeleting] = useState<boolean>(false);
+  const [isDeleteEquipmentModalOpen, setIsDeleteEquipmentModalOpen] = useState<boolean>(false);
 
   // ─── Create / Edit Form Modal State ───────────────────────
   const [isFormModalOpen, setIsFormModalOpen] = useState<boolean>(false);
@@ -266,6 +269,34 @@ export default function EquipmentDetailPage() {
     (l) => l.id === logToDelete
   );
 
+  const handleDeleteEquipment = async () => {
+    if (!equipment) return;
+    
+    // 1. Delete image from Supabase Storage if it's not the default
+    if (equipment.imageUrl && !equipment.imageUrl.startsWith("/") && equipment.imageUrl.includes("equipment-images")) {
+      try {
+        const fileName = equipment.imageUrl.split("/").pop();
+        if (fileName && fileName !== "placeholder-cpap.jpg") {
+          await supabase.storage.from("equipment-images").remove([fileName]);
+        }
+      } catch (err) {
+        console.error("Error deleting image from storage:", err);
+      }
+    }
+
+    // 2. Delete equipment from database
+    const { error } = await supabase.from("equipments").delete().eq("id", equipment.id);
+    
+    if (error) {
+      console.error("Supabase DELETE error:", error);
+      addToast(`Gagal menghapus alat: ${error.message}`, "error");
+      return;
+    }
+
+    addToast("Alat berhasil dihapus", "success");
+    router.push("/");
+  };
+
   // ─── Loading Spinner State ────────────────────────────────
   if (isLoading) {
     return (
@@ -381,14 +412,30 @@ export default function EquipmentDetailPage() {
 
         {/* RIGHT COLUMN (lg:col-span-7) - Maintenance Timeline & Filter Chips */}
         <div className="lg:col-span-7 w-full">
-          <div className="bg-white rounded-3xl shadow-xl border border-slate-200/80 p-5 sm:p-8">
-            <MaintenanceHistory
-              logs={equipment.maintenanceLogs}
-              isEditMode={isEditMode}
-              onAddLog={handleAddLog}
-              onEditLog={handleEditLog}
-              onDeleteLog={handleRequestDeleteLog}
-            />
+          <div className="bg-white rounded-3xl shadow-xl border border-slate-200/80 p-5 sm:p-8 flex flex-col h-full">
+            <div className="flex-grow">
+              <MaintenanceHistory
+                logs={equipment.maintenanceLogs}
+                isEditMode={isEditMode}
+                onAddLog={handleAddLog}
+                onEditLog={handleEditLog}
+                onDeleteLog={handleRequestDeleteLog}
+              />
+            </div>
+            
+            {/* Delete Equipment Button (Admin Only) */}
+            {isEditMode && (
+              <div className="mt-8 pt-6 border-t border-red-100 flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setIsDeleteEquipmentModalOpen(true)}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-white border border-red-200 hover:bg-red-50 text-red-600 font-bold text-sm shadow-sm transition-all cursor-pointer"
+                >
+                  <AlertCircle className="w-4 h-4" />
+                  Hapus Alat Permanen
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -462,6 +509,15 @@ export default function EquipmentDetailPage() {
             ? `[${selectedLogForModal.date}] ${selectedLogForModal.type} - ${selectedLogForModal.description}`
             : undefined
         }
+      />
+
+      {/* Delete Equipment Modal */}
+      <DeleteEquipmentModal
+        isOpen={isDeleteEquipmentModalOpen}
+        onClose={() => setIsDeleteEquipmentModalOpen(false)}
+        onConfirm={handleDeleteEquipment}
+        equipmentId={equipment.id}
+        equipmentName={equipment.name}
       />
 
       {/* QR Code Printable Label Sticker Modal */}

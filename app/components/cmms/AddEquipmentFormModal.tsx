@@ -17,6 +17,18 @@ import {
 import { supabase } from "@/lib/supabase";
 import { compressFileIfImage, UploadPhase } from "@/lib/imageCompression";
 
+const generateAbbreviation = (name: string): string => {
+  const cleanName = name.trim();
+  if (!cleanName) return "AST";
+  
+  const words = cleanName.split(/\s+/);
+  if (words.length > 1) {
+    return words.slice(0, 3).map(w => w[0]).join("").toUpperCase();
+  } else {
+    return cleanName.slice(0, 4).toUpperCase();
+  }
+};
+
 interface AddEquipmentFormModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -40,6 +52,8 @@ export const AddEquipmentFormModal: React.FC<AddEquipmentFormModalProps> = ({
   const [imageUrl, setImageUrl] = useState("");
   const [fileToUpload, setFileToUpload] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string>("");
+  const [idSuffix, setIdSuffix] = useState<string>("");
+  const [isIdManuallyEdited, setIsIdManuallyEdited] = useState<boolean>(false);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploadPhase, setUploadPhase] = useState<UploadPhase>("idle");
@@ -47,6 +61,9 @@ export const AddEquipmentFormModal: React.FC<AddEquipmentFormModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
+      const randomNum = Math.floor(1000 + Math.random() * 9000).toString();
+      setIdSuffix(randomNum);
+      setIsIdManuallyEdited(false);
       setId("");
       setName("");
       setBrandType("");
@@ -62,6 +79,16 @@ export const AddEquipmentFormModal: React.FC<AddEquipmentFormModalProps> = ({
       setIsSubmitting(false);
     }
   }, [isOpen]);
+
+  useEffect(() => {
+    if (isOpen && !isIdManuallyEdited) {
+      if (name.trim()) {
+        setId(`${generateAbbreviation(name)}-${idSuffix}`);
+      } else {
+        setId("");
+      }
+    }
+  }, [name, isIdManuallyEdited, isOpen, idSuffix]);
 
   if (!isOpen) return null;
 
@@ -208,7 +235,10 @@ export const AddEquipmentFormModal: React.FC<AddEquipmentFormModalProps> = ({
                 type="text"
                 required
                 value={id}
-                onChange={(e) => setId(e.target.value.toUpperCase())}
+                onChange={(e) => {
+                  setId(e.target.value.toUpperCase());
+                  setIsIdManuallyEdited(true);
+                }}
                 placeholder="e.g. CPAP-4"
                 className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm font-mono font-semibold text-slate-900 placeholder:text-slate-400 placeholder:font-sans focus:outline-none focus:ring-2 focus:ring-blue-600 focus:bg-white transition-all"
               />

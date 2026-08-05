@@ -20,7 +20,7 @@ import {
   LogOut,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import { AdminAuthModal } from "@/app/components/cmms/AdminAuthModal";
+
 import { AddEquipmentFormModal } from "@/app/components/cmms/AddEquipmentFormModal";
 import { QRScannerModal } from "@/app/components/cmms/QRScannerModal";
 import {
@@ -50,7 +50,6 @@ export default function HomePage() {
 
   // ─── Admin Edit Mode & Add Equipment Modal State ─────────
   const [isEditMode, setIsEditMode] = useState<boolean>(false);
-  const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState<boolean>(false);
   const [isScannerModalOpen, setIsScannerModalOpen] = useState<boolean>(false);
 
@@ -97,14 +96,19 @@ export default function HomePage() {
     fetchEquipments();
   }, [fetchEquipments]);
 
-  // Restore persistent Admin Session from localStorage
+  // Restore persistent Admin Session from localStorage and sync with GlobalHeader
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      const savedAdmin = localStorage.getItem("isAdmin");
-      if (savedAdmin === "true") {
-        setIsEditMode(true);
+    const checkAdminState = () => {
+      if (typeof window !== "undefined") {
+        const savedAdmin = localStorage.getItem("isAdmin");
+        setIsEditMode(savedAdmin === "true");
       }
-    }
+    };
+    checkAdminState();
+    window.addEventListener("adminChange", checkAdminState);
+    return () => {
+      window.removeEventListener("adminChange", checkAdminState);
+    };
   }, []);
 
   const handleSearch = (e: React.FormEvent) => {
@@ -149,63 +153,7 @@ export default function HomePage() {
     <div className="min-h-screen bg-slate-100/90 py-8 px-4 sm:px-6 lg:px-8">
       {/* GLOBAL LAYOUT: max-w-7xl mx-auto */}
       <div className="max-w-7xl mx-auto">
-        {/* Top Header with Both Logos & Login IPS Button */}
-        <div className="flex items-center justify-between mb-8 max-w-4xl mx-auto px-2">
-          <div className="flex items-center gap-2.5 sm:gap-4">
-            <img
-              src="/logo-jatim.png"
-              alt="Logo Pemprov Jawa Timur"
-              className="h-10 sm:h-12 w-auto object-contain drop-shadow-2xs"
-            />
-            <img
-              src="/logo-rsud-medika.png"
-              alt="Logo RS Menur"
-              className="h-9 sm:h-11 w-auto object-contain drop-shadow-2xs"
-            />
-            <div className="flex flex-col border-l border-slate-300 pl-3">
-              <span className="text-xs sm:text-sm font-black text-slate-900 tracking-wide uppercase leading-tight">
-                RS MENUR
-              </span>
-              <span className="text-[10px] sm:text-xs font-bold text-blue-600 tracking-wider uppercase">
-                IPS RS • CMMS
-              </span>
-            </div>
-          </div>
 
-          {/* Admin Mode Toggle / Login IPS Button */}
-          {!isEditMode ? (
-            <button
-              type="button"
-              onClick={() => setIsAuthModalOpen(true)}
-              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-white hover:bg-slate-50 text-slate-700 border border-slate-200/80 text-xs font-bold shadow-2xs hover:shadow-sm transition-all cursor-pointer"
-            >
-              <LogIn className="w-3.5 h-3.5 text-blue-600" />
-              <span>Login IPS</span>
-            </button>
-          ) : (
-            <div className="flex items-center gap-2">
-              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-100 text-emerald-800 border border-emerald-200 text-xs font-bold shadow-2xs">
-                <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-                <span className="hidden sm:inline">Admin IPS (Aktif)</span>
-              </span>
-              <button
-                type="button"
-                onClick={() => {
-                  if (typeof window !== "undefined") {
-                    localStorage.removeItem("isAdmin");
-                  }
-                  setIsEditMode(false);
-                  addToast("Keluar dari mode admin", "success");
-                }}
-                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-white hover:bg-red-50 text-slate-600 hover:text-red-600 border border-slate-200/80 text-xs font-bold shadow-2xs transition-all cursor-pointer"
-                title="Keluar Mode Admin"
-              >
-                <LogOut className="w-3.5 h-3.5" />
-                <span>Keluar</span>
-              </button>
-            </div>
-          )}
-        </div>
 
         {/* Hero Title */}
         <div className="text-center mb-8">
@@ -415,18 +363,7 @@ export default function HomePage() {
         )}
 
         {/* ═══ ROOT-LEVEL MODALS & TOASTS ═══ */}
-        <AdminAuthModal
-          isOpen={isAuthModalOpen}
-          onClose={() => setIsAuthModalOpen(false)}
-          onSuccess={() => {
-            if (typeof window !== "undefined") {
-              localStorage.setItem("isAdmin", "true");
-            }
-            setIsAuthModalOpen(false);
-            setIsEditMode(true);
-            addToast("Mode Admin IPS diaktifkan! Anda dapat menambahkan alat baru 🔓", "success");
-          }}
-        />
+
 
         <AddEquipmentFormModal
           isOpen={isAddModalOpen}

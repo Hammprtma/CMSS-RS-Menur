@@ -8,7 +8,7 @@ import { InfoSectionHeader } from "@/app/components/cmms/InfoSectionHeader";
 import { EquipmentDetailsGrid } from "@/app/components/cmms/EquipmentDetailsGrid";
 import { MaintenanceHistory } from "@/app/components/cmms/MaintenanceHistory";
 import { DeleteConfirmModal } from "@/app/components/cmms/DeleteConfirmModal";
-import { AdminAuthModal } from "@/app/components/cmms/AdminAuthModal";
+
 import { CertificateModal } from "@/app/components/cmms/CertificateModal";
 import { EditEquipmentModal } from "@/app/components/cmms/EditEquipmentModal";
 import { QRCodeModal } from "@/app/components/cmms/QRCodeModal";
@@ -36,7 +36,6 @@ export default function EquipmentDetailPage() {
 
   // ─── Admin Edit Mode ───────────────────────────────────────
   const [isEditMode, setIsEditMode] = useState<boolean>(false);
-  const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
 
   // ─── Certificate & QR Code Modal ──────────────────────────
   const [isCertificateModalOpen, setIsCertificateModalOpen] =
@@ -138,35 +137,18 @@ export default function EquipmentDetailPage() {
 
   // ─── Restore persistent Admin Session from localStorage ───
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      const savedAdmin = localStorage.getItem("isAdmin");
-      if (savedAdmin === "true") {
-        setIsEditMode(true);
-      }
-    }
-  }, []);
-
-  // ─── Auth Toggle ──────────────────────────────────────────
-  const toggleEditMode = () => {
-    if (isEditMode) {
+    const checkAdminState = () => {
       if (typeof window !== "undefined") {
-        localStorage.removeItem("isAdmin");
+        const savedAdmin = localStorage.getItem("isAdmin");
+        setIsEditMode(savedAdmin === "true");
       }
-      setIsEditMode(false);
-      addToast("Keluar dari mode admin", "success");
-    } else {
-      setIsAuthModalOpen(true);
-    }
-  };
-
-  const handleAuthSuccess = () => {
-    if (typeof window !== "undefined") {
-      localStorage.setItem("isAdmin", "true");
-    }
-    setIsAuthModalOpen(false);
-    setIsEditMode(true);
-    addToast("Mode Admin IPS diaktifkan! 🔓", "success");
-  };
+    };
+    checkAdminState();
+    window.addEventListener("adminChange", checkAdminState);
+    return () => {
+      window.removeEventListener("adminChange", checkAdminState);
+    };
+  }, []);
 
   // ═══════════════════════════════════════════════════════════
   //  CRUD: CREATE — Open blank form modal
@@ -349,22 +331,7 @@ export default function EquipmentDetailPage() {
               <span>Kembali</span>
             </Link>
 
-            {/* Official Logos */}
-            <div className="hidden sm:flex items-center gap-2.5 pl-3 border-l border-slate-200">
-              <img
-                src="/logo-jatim.png"
-                alt="Logo Jawa Timur"
-                className="h-8 w-auto object-contain drop-shadow-2xs"
-              />
-              <img
-                src="/logo-rsud-medika.png"
-                alt="Logo RS Menur"
-                className="h-7 w-auto object-contain drop-shadow-2xs"
-              />
-              <span className="text-xs font-extrabold text-slate-800 tracking-wide uppercase ml-1">
-                RS MENUR
-              </span>
-            </div>
+
           </div>
 
           <div className="flex items-center gap-3">
@@ -399,7 +366,6 @@ export default function EquipmentDetailPage() {
             <div className="px-5 pt-6">
               <InfoSectionHeader
                 isEditMode={isEditMode}
-                onToggleEditMode={toggleEditMode}
                 onEditEquipment={() => setIsEditEquipmentModalOpen(true)}
                 onOpenQrModal={() => setIsQrModalOpen(true)}
               />
@@ -475,12 +441,7 @@ export default function EquipmentDetailPage() {
         }}
       />
 
-      {/* Admin Auth Modal (Password Verification) */}
-      <AdminAuthModal
-        isOpen={isAuthModalOpen}
-        onClose={() => setIsAuthModalOpen(false)}
-        onSuccess={handleAuthSuccess}
-      />
+
 
       {/* Edit Equipment Photo & Data Modal */}
       <EditEquipmentModal

@@ -17,6 +17,8 @@ import {
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { compressFileIfImage, UploadPhase } from "@/lib/imageCompression";
+import { RS_MENUR_ROOMS } from "@/app/lib/constants";
+import { CustomDropdown } from "@/app/components/cmms/CustomDropdown";
 
 const generateAbbreviation = (name: string): string => {
   const cleanName = name.trim();
@@ -319,13 +321,12 @@ export const AddEquipmentFormModal: React.FC<AddEquipmentFormModalProps> = ({
                 <MapPin className="w-3.5 h-3.5 text-blue-600" />
                 <span>RUANGAN *</span>
               </label>
-              <input
-                type="text"
-                required
+              <CustomDropdown
+                options={RS_MENUR_ROOMS.map((r) => ({ value: r, label: r }))}
                 value={room}
-                onChange={(e) => setRoom(e.target.value)}
-                placeholder="e.g. ICU / IGD / Ruang Menur"
-                className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm font-medium text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:bg-white transition-all"
+                onChange={(val) => setRoom(val)}
+                placeholder="Pilih Ruangan..."
+                className="w-full"
               />
             </div>
 
@@ -351,25 +352,16 @@ export const AddEquipmentFormModal: React.FC<AddEquipmentFormModalProps> = ({
               <Activity className="w-3.5 h-3.5 text-blue-600" />
               <span>STATUS ALAT *</span>
             </label>
-            <select
+            <CustomDropdown
+              options={[
+                { value: "Baik", label: "Baik (Siap Operasional)" },
+                { value: "Rusak", label: "Rusak (Perlu Perbaikan)" },
+                { value: "Kalibrasi", label: "Kalibrasi (Jadwal Pemeliharaan)" },
+              ]}
               value={status}
-              onChange={(e) =>
-                setStatus(
-                  e.target.value as "Baik" | "Rusak" | "Kalibrasi"
-                )
-              }
-              className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:bg-white transition-all cursor-pointer"
-            >
-              <option value="Baik" className="text-emerald-700 font-bold">
-                Baik (Siap Operasional)
-              </option>
-              <option value="Rusak" className="text-red-700 font-bold">
-                Rusak (Perlu Perbaikan)
-              </option>
-              <option value="Kalibrasi" className="text-amber-700 font-bold">
-                Kalibrasi (Jadwal Pemeliharaan)
-              </option>
-            </select>
+              onChange={(val) => setStatus(val as "Baik" | "Rusak" | "Kalibrasi")}
+              className="w-full"
+            />
           </div>
 
           {/* Foto Alat Input (URL or Upload with Preview Thumbnail) */}

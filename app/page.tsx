@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -18,15 +18,25 @@ import {
   PlusCircle,
   ShieldCheck,
   LogOut,
+  FileSpreadsheet,
+  MapPin,
+  Activity,
+  AlertTriangle,
+  Clock,
+  CheckCircle,
+  AlertCircle,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { RS_MENUR_ROOMS } from "@/app/lib/constants";
 
 import { AddEquipmentFormModal } from "@/app/components/cmms/AddEquipmentFormModal";
+import { ImportCsvModal } from "@/app/components/cmms/ImportCsvModal";
 import { QRScannerModal } from "@/app/components/cmms/QRScannerModal";
 import {
   ToastNotification,
   Toast,
 } from "@/app/components/cmms/ToastNotification";
+import { CustomDropdown } from "@/app/components/cmms/CustomDropdown";
 
 interface EquipmentCardItem {
   id: string;
@@ -41,16 +51,56 @@ interface EquipmentCardItem {
 export default function HomePage() {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<
-    "Semua" | "Baik" | "Rusak" | "Kalibrasi"
-  >("Semua");
+  const [statusFilter, setStatusFilter] = useState<string>("Semua Status");
+  const [roomFilter, setRoomFilter] = useState<string>("Semua Ruangan");
 
   const [equipmentList, setEquipmentList] = useState<EquipmentCardItem[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
+  // ─── Analytics Dashboard Logic ─────────────────────────
+  const dashboardStats = useMemo(() => {
+    let operationalCount = 0;
+    let needsRepairCount = 0;
+    let calibrationDueCount = 0;
+
+    const now = new Date();
+    const thirtyDaysFromNow = new Date();
+    thirtyDaysFromNow.setDate(now.getDate() + 30);
+
+    equipmentList.forEach((item) => {
+      // 1. Status Counts
+      if (item.status === "Baik") {
+        operationalCount++;
+      } else if (item.status === "Rusak" || item.status === "Perlu Perbaikan") {
+        needsRepairCount++;
+      }
+
+      // 2. Calibration Due Logic
+      if (item.tglKalibrasi && item.tglKalibrasi !== "-") {
+        const lastCalDate = new Date(item.tglKalibrasi);
+        if (!isNaN(lastCalDate.getTime())) {
+          const expiryDate = new Date(lastCalDate);
+          expiryDate.setFullYear(expiryDate.getFullYear() + 1);
+
+          if (expiryDate <= thirtyDaysFromNow) {
+            calibrationDueCount++;
+          }
+        }
+      }
+    });
+
+    return {
+      totalEquipment: equipmentList.length,
+      operationalCount,
+      needsRepairCount,
+      calibrationDueCount,
+    };
+  }, [equipmentList]);
+
   // ─── Admin Edit Mode & Add Equipment Modal State ─────────
   const [isEditMode, setIsEditMode] = useState<boolean>(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState<boolean>(false);
+  const [isImportCsvModalOpen, setIsImportCsvModalOpen] = useState<boolean>(false);
   const [isScannerModalOpen, setIsScannerModalOpen] = useState<boolean>(false);
 
   // ─── Toast Notifications ─────────────────────────────────
@@ -124,7 +174,9 @@ export default function HomePage() {
   // Filter live equipment cards by status and search text
   const filteredEquipment = equipmentList.filter((item) => {
     const matchesStatus =
-      statusFilter === "Semua" ? true : item.status === statusFilter;
+      statusFilter === "Semua Status" ? true : item.status === statusFilter;
+    const matchesRoom =
+      roomFilter === "Semua Ruangan" ? true : item.room === roomFilter;
     const q = searchQuery.trim().toLowerCase();
     const matchesSearch =
       q === ""
@@ -133,7 +185,7 @@ export default function HomePage() {
           item.name.toLowerCase().includes(q) ||
           item.serialNumber.toLowerCase().includes(q) ||
           item.room.toLowerCase().includes(q);
-    return matchesStatus && matchesSearch;
+    return matchesStatus && matchesRoom && matchesSearch;
   });
 
   const getStatusBadgeStyles = (status: "Baik" | "Rusak" | "Kalibrasi" | string) => {
@@ -164,6 +216,71 @@ export default function HomePage() {
             Arahkan pemindai ke barcode alat untuk melihat riwayat atau cari ID aset secara manual.
           </p>
         </div>
+
+        {/* ─── ANALYTICS DASHBOARD ─── */}
+        {!isLoading && isEditMode && equipmentList.length > 0 && (
+          <div className="mb-8">
+            {/* Stats Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+              {/* Total Alat */}
+              <div className="bg-white rounded-xl shadow-sm border border-slate-200/80 p-4 flex items-center gap-4">
+                <div className="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 shrink-0">
+                  <Activity className="w-6 h-6" />
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Total Alat</p>
+                  <p className="text-2xl font-extrabold text-slate-900">{dashboardStats.totalEquipment}</p>
+                </div>
+              </div>
+
+              {/* Siap Operasional */}
+              <div className="bg-white rounded-xl shadow-sm border border-slate-200/80 p-4 flex items-center gap-4">
+                <div className="w-12 h-12 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600 shrink-0">
+                  <CheckCircle className="w-6 h-6" />
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Siap Operasional</p>
+                  <p className="text-2xl font-extrabold text-slate-900">{dashboardStats.operationalCount}</p>
+                </div>
+              </div>
+
+              {/* Sedang Rusak */}
+              <div className="bg-white rounded-xl shadow-sm border border-slate-200/80 p-4 flex items-center gap-4">
+                <div className="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center text-red-600 shrink-0">
+                  <AlertTriangle className="w-6 h-6" />
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Sedang Rusak</p>
+                  <p className="text-2xl font-extrabold text-slate-900">{dashboardStats.needsRepairCount}</p>
+                </div>
+              </div>
+
+              {/* Waktunya Kalibrasi */}
+              <div className="bg-white rounded-xl shadow-sm border border-slate-200/80 p-4 flex items-center gap-4">
+                <div className="w-12 h-12 rounded-full bg-amber-50 flex items-center justify-center text-amber-600 shrink-0">
+                  <Clock className="w-6 h-6" />
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Waktunya Kalibrasi</p>
+                  <p className="text-2xl font-extrabold text-slate-900">{dashboardStats.calibrationDueCount}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Urgent Alert Banner */}
+            {dashboardStats.calibrationDueCount > 0 && (
+              <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-start gap-3 shadow-sm animate-fade-in">
+                <AlertCircle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+                <div>
+                  <h4 className="text-sm font-bold text-red-800">⚠️ Peringatan Kalibrasi</h4>
+                  <p className="text-xs text-red-700 mt-1 font-medium">
+                    Ada <span className="font-extrabold">{dashboardStats.calibrationDueCount} alat</span> yang masa kalibrasinya sudah habis atau akan habis dalam 30 hari ke depan. Mohon segera dijadwalkan ulang!
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Main Search Area & Camera Scanner Placeholder */}
         <div className="max-w-xl mx-auto bg-white rounded-3xl shadow-xl border border-slate-200/80 p-5 sm:p-6 mb-8">
@@ -205,32 +322,37 @@ export default function HomePage() {
             </button>
           </form>
 
-          {/* Filter by Status Pills/Chips */}
-          <div className="mt-5 pt-4 border-t border-slate-100 flex items-center justify-between flex-wrap gap-2">
-            <div className="flex items-center gap-1.5 text-xs font-bold text-slate-500">
-              <Filter className="w-3.5 h-3.5 text-slate-400" />
-              <span>Filter Status:</span>
+          {/* Filters: Room and Status */}
+          <div className="mt-5 pt-4 border-t border-slate-100 grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="flex flex-col">
+              <label className="text-[11px] font-bold text-slate-500 mb-1 flex items-center gap-1">
+                <MapPin className="w-3 h-3" />
+                <span>FILTER RUANGAN</span>
+              </label>
+              <CustomDropdown
+                options={[
+                  { value: "Semua Ruangan", label: "Semua Ruangan" },
+                  ...RS_MENUR_ROOMS.map((r) => ({ value: r, label: r })),
+                ]}
+                value={roomFilter}
+                onChange={(val) => setRoomFilter(val)}
+              />
             </div>
-            <div className="flex items-center gap-1.5">
-              {(
-                ["Semua", "Baik", "Rusak", "Kalibrasi"] as const
-              ).map((chip) => {
-                const isActive = statusFilter === chip;
-                return (
-                  <button
-                    key={chip}
-                    type="button"
-                    onClick={() => setStatusFilter(chip)}
-                    className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all duration-150 cursor-pointer ${
-                      isActive
-                        ? "bg-blue-600 text-white shadow-xs ring-2 ring-blue-600/20"
-                        : "bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900"
-                    }`}
-                  >
-                    {chip}
-                  </button>
-                );
-              })}
+            <div className="flex flex-col">
+              <label className="text-[11px] font-bold text-slate-500 mb-1 flex items-center gap-1">
+                <Activity className="w-3 h-3" />
+                <span>FILTER STATUS</span>
+              </label>
+              <CustomDropdown
+                options={[
+                  { value: "Semua Status", label: "Semua Status" },
+                  { value: "Baik", label: "Baik (Siap Operasional)" },
+                  { value: "Rusak", label: "Rusak (Perlu Perbaikan)" },
+                  { value: "Kalibrasi", label: "Kalibrasi (Jadwal Pemeliharaan)" },
+                ]}
+                value={statusFilter}
+                onChange={(val) => setStatusFilter(val)}
+              />
             </div>
           </div>
         </div>
@@ -246,14 +368,24 @@ export default function HomePage() {
 
           {/* ADMIN ACTION BUTTON: Visible only when isEditMode is true */}
           {isEditMode && (
-            <button
-              type="button"
-              onClick={() => setIsAddModalOpen(true)}
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white text-xs font-bold shadow-md shadow-blue-600/25 transition-all cursor-pointer animate-fade-in"
-            >
-              <PlusCircle className="w-4 h-4" />
-              <span>+ Tambah Alat Baru</span>
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setIsImportCsvModalOpen(true)}
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white text-xs font-bold shadow-md shadow-indigo-600/25 transition-all cursor-pointer animate-fade-in"
+              >
+                <FileSpreadsheet className="w-4 h-4" />
+                <span className="hidden sm:inline">Import CSV</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsAddModalOpen(true)}
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white text-xs font-bold shadow-md shadow-blue-600/25 transition-all cursor-pointer animate-fade-in"
+              >
+                <PlusCircle className="w-4 h-4" />
+                <span>+ Tambah Alat Baru</span>
+              </button>
+            </div>
           )}
         </div>
 
@@ -276,8 +408,8 @@ export default function HomePage() {
                 href={`/equipment/${item.id}`}
                 className="block group h-full"
               >
-                <div className="h-full bg-white hover:bg-slate-50 border border-slate-200/80 hover:border-blue-300 rounded-2xl p-5 shadow-2xs hover:shadow-md transition-all duration-150 flex items-center justify-between cursor-pointer">
-                  <div className="flex-1 pr-3 flex items-start gap-4">
+                <div className="h-full bg-white hover:bg-slate-50 border border-slate-200/80 hover:border-blue-300 rounded-2xl p-4 sm:p-5 shadow-2xs hover:shadow-md transition-all duration-150 flex items-center justify-between cursor-pointer overflow-hidden">
+                  <div className="flex-1 min-w-0 pr-3 flex items-start gap-3 sm:gap-4">
                     {/* Equipment Photo Thumbnail */}
                     <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl border border-slate-200/80 bg-slate-50 p-1.5 shrink-0 overflow-hidden flex items-center justify-center shadow-2xs">
                       <img
@@ -328,7 +460,7 @@ export default function HomePage() {
                     </div>
                   </div>
 
-                  <div className="w-8 h-8 rounded-full bg-slate-100 group-hover:bg-blue-100 flex items-center justify-center text-slate-400 group-hover:text-blue-600 transition-colors shrink-0">
+                  <div className="flex-shrink-0 ml-2 sm:ml-4 w-8 h-8 rounded-full bg-slate-100 group-hover:bg-blue-100 flex items-center justify-center text-slate-400 group-hover:text-blue-600 transition-colors">
                     <ChevronRight className="w-4 h-4" />
                   </div>
                 </div>
@@ -342,18 +474,17 @@ export default function HomePage() {
               <SearchX className="w-7 h-7" />
             </div>
             <h3 className="text-base font-bold text-slate-800">
-              Data tidak ditemukan
+              Tidak ada alat yang ditemukan
             </h3>
             <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
-              Tidak ada alat yang cocok dengan kata kunci &quot;
-              {searchQuery}&quot; atau filter &quot;{statusFilter}&quot;.
-              Silakan coba pencarian lain.
+              Kombinasi pencarian, filter ruangan, dan filter status tidak mengembalikan hasil. Silakan sesuaikan kembali filter Anda.
             </p>
             <button
               type="button"
               onClick={() => {
                 setSearchQuery("");
-                setStatusFilter("Semua");
+                setStatusFilter("Semua Status");
+                setRoomFilter("Semua Ruangan");
               }}
               className="mt-5 px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition-colors cursor-pointer"
             >
@@ -368,6 +499,13 @@ export default function HomePage() {
         <AddEquipmentFormModal
           isOpen={isAddModalOpen}
           onClose={() => setIsAddModalOpen(false)}
+          onSuccess={fetchEquipments}
+          addToast={addToast}
+        />
+
+        <ImportCsvModal
+          isOpen={isImportCsvModalOpen}
+          onClose={() => setIsImportCsvModalOpen(false)}
           onSuccess={fetchEquipments}
           addToast={addToast}
         />

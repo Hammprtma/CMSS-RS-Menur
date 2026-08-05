@@ -48,6 +48,27 @@ interface EquipmentCardItem {
   imageUrl: string;
 }
 
+type CalibrationStatus = 'SAFE' | 'WARNING' | 'EXPIRED' | 'UNKNOWN';
+
+const getCalibrationStatus = (calibrationDateStr: string): CalibrationStatus => {
+  if (!calibrationDateStr || calibrationDateStr === "-") return 'UNKNOWN';
+  
+  const lastCalDate = new Date(calibrationDateStr);
+  if (isNaN(lastCalDate.getTime())) return 'UNKNOWN';
+
+  const expiryDate = new Date(lastCalDate);
+  expiryDate.setFullYear(expiryDate.getFullYear() + 1);
+
+  const warningDate = new Date(expiryDate);
+  warningDate.setMonth(warningDate.getMonth() - 3);
+
+  const now = new Date();
+
+  if (now >= expiryDate) return 'EXPIRED';
+  if (now >= warningDate) return 'WARNING';
+  return 'SAFE';
+};
+
 export default function HomePage() {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
@@ -76,16 +97,9 @@ export default function HomePage() {
       }
 
       // 2. Calibration Due Logic
-      if (item.tglKalibrasi && item.tglKalibrasi !== "-") {
-        const lastCalDate = new Date(item.tglKalibrasi);
-        if (!isNaN(lastCalDate.getTime())) {
-          const expiryDate = new Date(lastCalDate);
-          expiryDate.setFullYear(expiryDate.getFullYear() + 1);
-
-          if (expiryDate <= thirtyDaysFromNow) {
-            calibrationDueCount++;
-          }
-        }
+      const calStatus = getCalibrationStatus(item.tglKalibrasi);
+      if (calStatus === 'WARNING' || calStatus === 'EXPIRED') {
+        calibrationDueCount++;
       }
     });
 
@@ -173,10 +187,18 @@ export default function HomePage() {
 
   // Filter live equipment cards by status and search text
   const filteredEquipment = equipmentList.filter((item) => {
-    const matchesStatus =
-      statusFilter === "Semua Status" ? true : item.status === statusFilter;
+    let matchesStatus = true;
+    if (statusFilter === "NEED_CALIBRATION") {
+      const calStatus = getCalibrationStatus(item.tglKalibrasi);
+      matchesStatus = calStatus === 'WARNING' || calStatus === 'EXPIRED';
+    } else if (statusFilter !== "Semua Status") {
+      matchesStatus = item.status === statusFilter;
+    }
+
     const matchesRoom =
-      roomFilter === "Semua Ruangan" ? true : item.room === roomFilter;
+      roomFilter === "Semua Ruangan"
+        ? true
+        : item.room && item.room.toLowerCase().includes(roomFilter.toLowerCase());
     const q = searchQuery.trim().toLowerCase();
     const matchesSearch =
       q === ""
@@ -274,7 +296,7 @@ export default function HomePage() {
                 <div>
                   <h4 className="text-sm font-bold text-red-800">⚠️ Peringatan Kalibrasi</h4>
                   <p className="text-xs text-red-700 mt-1 font-medium">
-                    Ada <span className="font-extrabold">{dashboardStats.calibrationDueCount} alat</span> yang masa kalibrasinya sudah habis atau akan habis dalam 30 hari ke depan. Mohon segera dijadwalkan ulang!
+                    Ada <span className="font-extrabold">{dashboardStats.calibrationDueCount} alat</span> yang masa kalibrasinya akan habis dalam 3 bulan ke depan atau sudah lewat!
                   </p>
                 </div>
               </div>
@@ -349,6 +371,7 @@ export default function HomePage() {
                   { value: "Baik", label: "Baik (Siap Operasional)" },
                   { value: "Rusak", label: "Rusak (Perlu Perbaikan)" },
                   { value: "Kalibrasi", label: "Kalibrasi (Jadwal Pemeliharaan)" },
+                  { value: "NEED_CALIBRATION", label: "Butuh Kalibrasi (H-3 Bulan)" },
                 ]}
                 value={statusFilter}
                 onChange={(val) => setStatusFilter(val)}
@@ -456,6 +479,16 @@ export default function HomePage() {
                         <span className="font-semibold font-mono text-slate-700">
                           {item.tglKalibrasi}
                         </span>
+                        {getCalibrationStatus(item.tglKalibrasi) === 'WARNING' && (
+                          <span className="bg-yellow-100 text-yellow-800 text-[10px] font-bold px-2 py-0.5 rounded-full ml-auto whitespace-nowrap">
+                            ⚠️ H-3 Bulan
+                          </span>
+                        )}
+                        {getCalibrationStatus(item.tglKalibrasi) === 'EXPIRED' && (
+                          <span className="bg-red-100 text-red-800 text-[10px] font-bold px-2 py-0.5 rounded-full ml-auto whitespace-nowrap">
+                            🚨 Kedaluwarsa
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>

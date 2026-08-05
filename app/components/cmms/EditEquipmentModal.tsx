@@ -39,6 +39,7 @@ export const EditEquipmentModal: React.FC<EditEquipmentModalProps> = ({
   const [brandType, setBrandType] = useState("");
   const [serialNumber, setSerialNumber] = useState("");
   const [room, setRoom] = useState("");
+  const [floorNumber, setFloorNumber] = useState("");
   const [calibrationDate, setCalibrationDate] = useState("");
   const [status, setStatus] = useState<"Baik" | "Rusak" | "Kalibrasi">("Baik");
   const [imageUrl, setImageUrl] = useState("");
@@ -54,7 +55,17 @@ export const EditEquipmentModal: React.FC<EditEquipmentModalProps> = ({
       setName(equipment.name || "");
       setBrandType(equipment.details?.merkTipe || "");
       setSerialNumber(equipment.details?.noSeri || "");
-      setRoom(equipment.details?.ruangan || "");
+      
+      let initialRoom = equipment.details?.ruangan || "";
+      let initialFloor = "";
+      if (initialRoom.includes(" Lantai ")) {
+        const parts = initialRoom.split(" Lantai ");
+        initialRoom = parts[0];
+        initialFloor = parts[1];
+      }
+      setRoom(initialRoom);
+      setFloorNumber(initialFloor);
+
       setCalibrationDate(equipment.details?.tglKalibrasi || new Date().toISOString().split("T")[0]);
       setStatus(
         (equipment.status as "Baik" | "Rusak" | "Kalibrasi") || "Baik"
@@ -133,13 +144,15 @@ export const EditEquipmentModal: React.FC<EditEquipmentModalProps> = ({
       }
 
       // Execute Supabase UPDATE query into 'equipments' table
+      const finalRoom = floorNumber.trim() ? `${room} Lantai ${floorNumber.trim()}` : room;
+
       const { error: updateError } = await supabase
         .from("equipments")
         .update({
           name: name.trim(),
           brand_type: brandType.trim(),
           serial_number: serialNumber.trim(),
-          room: room.trim(),
+          room: finalRoom.trim(),
           calibration_date: calibrationDate,
           status: status,
           image_url: finalImageUrl,
@@ -265,19 +278,32 @@ export const EditEquipmentModal: React.FC<EditEquipmentModalProps> = ({
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {/* Ruangan */}
+            {/* Ruangan & Lantai */}
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center gap-1">
                 <MapPin className="w-3.5 h-3.5 text-blue-600" />
-                <span>RUANGAN *</span>
+                <span>RUANGAN & LANTAI *</span>
               </label>
-              <CustomDropdown
-                options={RS_MENUR_ROOMS.map((r) => ({ value: r, label: r }))}
-                value={room}
-                onChange={(val) => setRoom(val)}
-                placeholder="Pilih Ruangan..."
-                className="w-full"
-              />
+              <div className="flex gap-2 h-10">
+                <div className="flex-[2] min-w-0">
+                  <CustomDropdown
+                    options={RS_MENUR_ROOMS.map((r) => ({ value: r, label: r }))}
+                    value={room}
+                    onChange={(val) => setRoom(val)}
+                    placeholder="Pilih Ruangan..."
+                    className="w-full h-full"
+                  />
+                </div>
+                <div className="flex-1 min-w-0 shrink-0">
+                  <input
+                    type="text"
+                    value={floorNumber}
+                    onChange={(e) => setFloorNumber(e.target.value)}
+                    placeholder="Lantai (Opsional, e.g. 1)"
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2 text-sm font-medium text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:bg-white transition-all h-full"
+                  />
+                </div>
+              </div>
             </div>
 
             {/* Tanggal Kalibrasi */}

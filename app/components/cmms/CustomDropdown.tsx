@@ -63,7 +63,7 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
       </button>
 
       {isOpen && (
-        <div className="absolute z-50 mt-2 w-full bg-white rounded-xl shadow-lg border border-slate-100 overflow-hidden max-h-60 overflow-y-auto animate-fade-in">
+        <div className="absolute z-50 mt-2 w-full min-w-[240px] bg-white rounded-xl shadow-lg border border-slate-100 overflow-hidden max-h-60 overflow-y-auto animate-fade-in">
           <ul className="py-1 m-0 list-none">
             {options.map((option) => {
               const isSelected = option.value === value;

@@ -21,9 +21,30 @@ import {
   ToastNotification,
   Toast,
 } from "@/app/components/cmms/ToastNotification";
-import { ChevronLeft, RefreshCw, ArrowLeft, AlertCircle } from "lucide-react";
+import { ChevronLeft, RefreshCw, ArrowLeft, AlertCircle, TriangleAlert, AlertOctagon } from "lucide-react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
+
+type CalibrationStatus = 'SAFE' | 'WARNING' | 'EXPIRED' | 'UNKNOWN';
+
+const getCalibrationStatus = (calibrationDateStr: string): CalibrationStatus => {
+  if (!calibrationDateStr || calibrationDateStr === "-") return 'UNKNOWN';
+  
+  const lastCalDate = new Date(calibrationDateStr);
+  if (isNaN(lastCalDate.getTime())) return 'UNKNOWN';
+
+  const expiryDate = new Date(lastCalDate);
+  expiryDate.setFullYear(expiryDate.getFullYear() + 1);
+
+  const warningDate = new Date(expiryDate);
+  warningDate.setMonth(warningDate.getMonth() - 3);
+
+  const now = new Date();
+
+  if (now >= expiryDate) return 'EXPIRED';
+  if (now >= warningDate) return 'WARNING';
+  return 'SAFE';
+};
 
 export default function EquipmentDetailPage() {
   const params = useParams();
@@ -35,6 +56,7 @@ export default function EquipmentDetailPage() {
   const [equipment, setEquipment] = useState<Equipment | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [notFound, setNotFound] = useState<boolean>(false);
+  const [calibrationStatus, setCalibrationStatus] = useState<CalibrationStatus>('SAFE');
 
   // ─── Admin Edit Mode ───────────────────────────────────────
   const [isEditMode, setIsEditMode] = useState<boolean>(false);
@@ -131,6 +153,7 @@ export default function EquipmentDetailPage() {
     };
 
     setEquipment(mappedEquipment);
+    setCalibrationStatus(getCalibrationStatus(mappedEquipment.details.tglKalibrasi));
     setIsLoading(false);
   }, [equipmentId]);
 
@@ -380,6 +403,29 @@ export default function EquipmentDetailPage() {
         </div>
       </div>
 
+      {/* Full-width Calibration Alert Banner */}
+      {calibrationStatus === 'WARNING' && (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
+          <div className="w-full bg-yellow-50 border border-yellow-400 text-yellow-800 p-4 mb-6 rounded-xl shadow-sm flex items-start sm:items-center gap-3">
+            <TriangleAlert className="w-6 h-6 text-yellow-600 shrink-0" />
+            <p className="text-sm font-bold">
+              Perhatian: Masa kalibrasi alat ini akan habis dalam waktu kurang dari 3 bulan. Harap jadwalkan kalibrasi ulang.
+            </p>
+          </div>
+        </div>
+      )}
+      
+      {calibrationStatus === 'EXPIRED' && (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
+          <div className="w-full bg-red-50 border border-red-500 text-red-800 p-4 mb-6 rounded-xl shadow-sm flex items-start sm:items-center gap-3 animate-pulse">
+            <AlertOctagon className="w-6 h-6 text-red-600 shrink-0" />
+            <p className="text-sm font-extrabold">
+              PERINGATAN KRITIS: Masa kalibrasi alat ini telah KEDALUWARSA! Segera lakukan kalibrasi ulang untuk standar keselamatan.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Main content wrapped in responsive grid container */}
       <div className="flex flex-col lg:grid lg:grid-cols-12 lg:gap-8 lg:items-start w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* LEFT COLUMN (lg:col-span-5) - Sticky on Desktop */}
@@ -527,6 +573,8 @@ export default function EquipmentDetailPage() {
         equipmentId={equipment.id}
         equipmentName={equipment.name}
         room={equipment.details?.ruangan}
+        brand={equipment.details?.merkTipe}
+        serialNumber={equipment.details?.noSeri}
       />
 
       {/* Toast Notifications (bottom-right corner) */}

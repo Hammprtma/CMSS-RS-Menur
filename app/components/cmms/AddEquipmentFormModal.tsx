@@ -13,6 +13,7 @@ import {
   Tag,
   Hash,
   Activity,
+  Trash2,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { compressFileIfImage, UploadPhase } from "@/lib/imageCompression";
@@ -54,6 +55,9 @@ export const AddEquipmentFormModal: React.FC<AddEquipmentFormModalProps> = ({
   const [previewUrl, setPreviewUrl] = useState<string>("");
   const [idSuffix, setIdSuffix] = useState<string>("");
   const [isIdManuallyEdited, setIsIdManuallyEdited] = useState<boolean>(false);
+  const [certificates, setCertificates] = useState<{ id: string; title: string; url: string }[]>([
+    { id: crypto.randomUUID(), title: "", url: "" },
+  ]);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploadPhase, setUploadPhase] = useState<UploadPhase>("idle");
@@ -77,6 +81,7 @@ export const AddEquipmentFormModal: React.FC<AddEquipmentFormModalProps> = ({
       setErrorMessage("");
       setUploadPhase("idle");
       setIsSubmitting(false);
+      setCertificates([{ id: crypto.randomUUID(), title: "", url: "" }]);
     }
   }, [isOpen]);
 
@@ -110,6 +115,7 @@ export const AddEquipmentFormModal: React.FC<AddEquipmentFormModalProps> = ({
     }
 
     setIsSubmitting(true);
+    const cleanedCertificates = certificates.filter(c => c.url.trim() !== "");
 
     try {
       let finalImageUrl = imageUrl.trim() || "/placeholder-cpap.jpg";
@@ -165,6 +171,7 @@ export const AddEquipmentFormModal: React.FC<AddEquipmentFormModalProps> = ({
           calibration_date: calibrationDate,
           status: status,
           image_url: finalImageUrl,
+          drive_certificates: cleanedCertificates,
         },
       ]);
 
@@ -415,6 +422,66 @@ export const AddEquipmentFormModal: React.FC<AddEquipmentFormModalProps> = ({
                 /placeholder-cpap.jpg
               </code>
             </p>
+          </div>
+
+          {/* Certificates Section */}
+          <div className="pt-4 border-t border-slate-100">
+            <label className="block text-xs font-bold text-slate-700 mb-2 flex items-center gap-1.5">
+              <LinkIcon className="w-3.5 h-3.5 text-blue-600" />
+              <span>SERTIFIKAT (LINK GOOGLE DRIVE) - OPSIONAL</span>
+            </label>
+            
+            <div className="space-y-3">
+              {certificates.map((cert, index) => (
+                <div key={cert.id} className="flex items-start gap-2 bg-slate-50 p-3 rounded-xl border border-slate-200">
+                  <div className="flex-1 space-y-2">
+                    <input
+                      type="text"
+                      placeholder="Nama Sertifikat (e.g. Kalibrasi 2026)"
+                      value={cert.title}
+                      onChange={(e) => {
+                        const newCerts = [...certificates];
+                        newCerts[index].title = e.target.value;
+                        setCertificates(newCerts);
+                      }}
+                      className="w-full bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-xs font-medium text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600 transition-all"
+                    />
+                    <input
+                      type="url"
+                      placeholder="Link Google Drive"
+                      value={cert.url}
+                      onChange={(e) => {
+                        const newCerts = [...certificates];
+                        newCerts[index].url = e.target.value;
+                        setCertificates(newCerts);
+                      }}
+                      className="w-full bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-xs font-medium text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600 transition-all"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCertificates(certificates.filter(c => c.id !== cert.id));
+                    }}
+                    className="mt-1 w-8 h-8 rounded-lg bg-red-50 hover:bg-red-100 text-red-500 hover:text-red-600 flex items-center justify-center transition-colors shadow-2xs cursor-pointer shrink-0"
+                    title="Hapus baris ini"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                setCertificates([...certificates, { id: crypto.randomUUID(), title: "", url: "" }]);
+              }}
+              className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-bold transition-colors shadow-2xs cursor-pointer"
+            >
+              <PlusCircle className="w-3.5 h-3.5" />
+              <span>Tambah Sertifikat Lain</span>
+            </button>
           </div>
 
           {/* Modal Buttons */}

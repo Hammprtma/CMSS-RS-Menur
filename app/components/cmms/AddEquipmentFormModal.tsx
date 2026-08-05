@@ -55,8 +55,8 @@ export const AddEquipmentFormModal: React.FC<AddEquipmentFormModalProps> = ({
   const [previewUrl, setPreviewUrl] = useState<string>("");
   const [idSuffix, setIdSuffix] = useState<string>("");
   const [isIdManuallyEdited, setIsIdManuallyEdited] = useState<boolean>(false);
-  const [certificates, setCertificates] = useState<{ id: string; title: string; url: string }[]>([
-    { id: crypto.randomUUID(), title: "", url: "" },
+  const [certificates, setCertificates] = useState<{ id: string; title: string; url: string; isManuallyEdited: boolean }[]>([
+    { id: crypto.randomUUID(), title: "", url: "", isManuallyEdited: false },
   ]);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -81,9 +81,19 @@ export const AddEquipmentFormModal: React.FC<AddEquipmentFormModalProps> = ({
       setErrorMessage("");
       setUploadPhase("idle");
       setIsSubmitting(false);
-      setCertificates([{ id: crypto.randomUUID(), title: "", url: "" }]);
+      setCertificates([{ id: crypto.randomUUID(), title: "", url: "", isManuallyEdited: false }]);
     }
   }, [isOpen]);
+
+  useEffect(() => {
+    if (isOpen) {
+      setCertificates((prevCerts) =>
+        prevCerts.map((cert) =>
+          !cert.isManuallyEdited ? { ...cert, title: brandType } : cert
+        )
+      );
+    }
+  }, [brandType, isOpen]);
 
   useEffect(() => {
     if (isOpen && !isIdManuallyEdited) {
@@ -115,7 +125,9 @@ export const AddEquipmentFormModal: React.FC<AddEquipmentFormModalProps> = ({
     }
 
     setIsSubmitting(true);
-    const cleanedCertificates = certificates.filter(c => c.url.trim() !== "");
+    const cleanedCertificates = certificates
+      .filter(c => c.url.trim() !== "")
+      .map(({ id, title, url }) => ({ id, title, url }));
 
     try {
       let finalImageUrl = imageUrl.trim() || "/placeholder-cpap.jpg";
@@ -442,6 +454,7 @@ export const AddEquipmentFormModal: React.FC<AddEquipmentFormModalProps> = ({
                       onChange={(e) => {
                         const newCerts = [...certificates];
                         newCerts[index].title = e.target.value;
+                        newCerts[index].isManuallyEdited = true;
                         setCertificates(newCerts);
                       }}
                       className="w-full bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-xs font-medium text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600 transition-all"
@@ -475,7 +488,7 @@ export const AddEquipmentFormModal: React.FC<AddEquipmentFormModalProps> = ({
             <button
               type="button"
               onClick={() => {
-                setCertificates([...certificates, { id: crypto.randomUUID(), title: "", url: "" }]);
+                setCertificates([...certificates, { id: crypto.randomUUID(), title: brandType, url: "", isManuallyEdited: false }]);
               }}
               className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-bold transition-colors shadow-2xs cursor-pointer"
             >

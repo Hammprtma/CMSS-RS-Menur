@@ -116,6 +116,7 @@ export default function EquipmentDetailPage() {
       status: eqData.status || "Baik",
       imageUrl: eqData.image_url || eqData.imageUrl || "/placeholder-cpap.jpg",
       certificateUrl: eqData.certificate_url || null,
+      drive_certificates: eqData.drive_certificates || [],
       details: {
         merkTipe: eqData.brand_type || eqData.brandType || "-",
         noSeri: eqData.serial_number || eqData.serialNumber || "-",
@@ -466,9 +467,10 @@ export default function EquipmentDetailPage() {
         equipmentId={equipment.id}
         details={equipment.details}
         certificateUrl={equipment.certificateUrl}
+        driveCertificates={equipment.drive_certificates}
         isEditMode={isEditMode}
         onUploadSuccess={async () => {
-          addToast("Sertifikat berhasil diunggah ke Supabase Storage ✅", "success");
+          addToast("Sertifikat berhasil diperbarui ✅", "success");
           await fetchEquipmentData();
         }}
       />

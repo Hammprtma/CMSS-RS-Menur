@@ -15,12 +15,19 @@ export interface MaintenanceLog {
   taskStatus: "SELESAI" | "BELUM SELESAI" | string;
 }
 
+export interface DriveCertificate {
+  id: string;
+  title: string;
+  url: string;
+}
+
 export interface Equipment {
   id: string;
   name: string;
   status: "Rusak" | "Baik" | string;
   imageUrl: string;
   certificateUrl?: string | null;
+  drive_certificates?: DriveCertificate[];
   details: EquipmentDetails;
   maintenanceLogs: MaintenanceLog[];
 }
